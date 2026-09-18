@@ -1,0 +1,1157 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "E-Tag Manager Dashboard";
+}
+
+<div class="container-fluid py-3">
+    <!-- Header Section -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3 gap-2">
+        <div>
+            <h2 class="fw-bold text-primary mb-1">E-Tag EBS-50 CMS Dashboard</h2>
+            <p class="text-muted mb-0">Hệ thống quản lý trạng thái máy và thẻ nhãn điện tử Opticon SE420RY (External CMS
+                Mode)</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <button class="btn btn-primary btn-sm px-3 fw-semibold shadow-sm" onclick="openLinkModal()">
+                    🔗 Ghép Thẻ Mới
+                </button>
+                <button class="btn btn-outline-dark btn-sm px-3 fw-semibold" onclick="openStateSettingsModal()">
+                    🎨 Cấu Hình Trạng Thái & Icon
+                </button>
+                <button class="btn btn-outline-dark btn-sm px-3 fw-semibold" onclick="openModelsModal()">
+                    📦 Quản Lý Models
+                </button>
+                <button class="btn btn-outline-secondary btn-sm px-3 fw-semibold" onclick="openConfigModal()">
+                    ⚙️ Cấu Hình EBS-50
+                </button>
+                <button class="btn btn-outline-info btn-sm px-3 fw-semibold" onclick="testSftpConnection()"
+                        id="btnTestSftp">
+                    <span id="spinnerTest" class="spinner-border spinner-border-sm d-none me-1"></span>
+                    Kiểm Tra SFTP
+                </button>
+                <button class="btn btn-warning btn-sm px-3 fw-semibold shadow-sm" onclick="syncAllTags()" id="btnSyncAll">
+                    <span id="spinnerSyncAll" class="spinner-border spinner-border-sm d-none me-1"></span>
+                    Đồng Bộ Tất Cả
+                </button>
+                <span class="badge bg-success fs-6 px-3 py-2">SQLite Active</span>
+            </div>
+        </div>
+
+        <!-- Alert Box -->
+        <div id="alertBox" class="alert alert-dismissible fade show d-none mb-3 shadow-sm" role="alert">
+            <span id="alertMessage"></span>
+            <button type="button" class="btn-close"
+                    onclick="document.getElementById('alertBox').classList.add('d-none')"></button>
+        </div>
+
+        <!-- Summary KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 border-start border-primary border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase fw-semibold mb-1">Tổng số Thẻ E-Tag</h6>
+                        <h2 class="fw-bold mb-0 text-dark" id="kpiTagCount">@Model.Tags.Count</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 border-start border-success border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase fw-semibold mb-1">Tổng số Models</h6>
+                        <h2 class="fw-bold mb-0 text-dark" id="kpiModelCount">@Model.ModelCount</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 border-start border-warning border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase fw-semibold mb-1">Trạng thái máy</h6>
+                        <h2 class="fw-bold mb-0 text-dark">@Model.States.Count</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Render Simulator Card -->
+        <div class="card shadow-sm mb-4 border-0 border-top border-primary border-3">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0 text-dark">Live Simulator: Trình Mô Phỏng Hiển Thị E-Paper (400x300)</h5>
+                <small class="text-muted">Kiểm tra kết quả render hình ảnh 4 màu (Trắng, Đỏ, Đen, Vàng) theo thời gian
+                    thực</small>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4 align-items-center">
+                        <div class="col-md-5">
+                            <form id="simForm" onsubmit="return false;">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Model Sản Phẩm:</label>
+                                    <input type="text" id="simModel" class="form-control" value="A27/M47/F70"
+                                           placeholder="Nhập tên Model..." />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Trạng Thái Máy:</label>
+                                    <select id="simState" class="form-select">
+                                        @foreach (var state in Model.States)
+                                        {
+                                            <option value="@state.StateCode">[@state.StateCode] @state.StateNameVi
+                                                (@state.StateNameKo)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Màu Chủ Đạo (4 Màu E-Paper):</label>
+                                        <div class="d-flex gap-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="simColor" id="colorRed"
+                                                       value="Red" checked>
+                                                <label class="form-check-label text-danger fw-bold" for="colorRed">Đỏ (Red)</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="simColor" id="colorYellow"
+                                                       value="Yellow">
+                                                <label class="form-check-label text-warning fw-bold" for="colorYellow">Vàng
+                                                    (Yellow)</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="simColor" id="colorBlack"
+                                                           value="Black">
+                                                    <label class="form-check-label text-dark fw-bold" for="colorBlack">Đen
+                                                        (Black)</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary px-4 fw-semibold" onclick="updateSimulator()">
+                                                Render Thử Nghiệm
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="col-md-7 text-center">
+                                        <div class="p-3 bg-light border rounded d-inline-block shadow-sm">
+                                            <div class="fw-semibold text-muted mb-2 small">Hình ảnh mô phỏng hiển thị trên E-tag SE420RY
+                                                (400 x 300 px)</div>
+                                                <img id="simPreviewImg" src="/api/render/simulate?model=A27/M47/F70&state=0&color=Red"
+                                                     alt="E-tag Live Preview" class="border rounded shadow-sm"
+                                                     style="width: 400px; height: 300px; object-fit: contain; background: white;" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- E-Tags Management Card & Filter Toolbar -->
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-white py-3">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                        <h5 class="fw-bold mb-0 text-dark">Danh Sách Thẻ Nhãn & Vị Trí Máy</h5>
+                                        <span class="text-muted small">Cập nhật trạng thái trực tiếp hoặc qua MES API</span>
+                                    </div>
+
+                                    <!-- Filter Toolbar -->
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-md-4">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-light">🔍</span>
+                                                <input type="text" id="filterSearch" class="form-control"
+                                                       placeholder="Tìm theo Mã Máy hoặc MAC..." oninput="filterTagsTable()" />
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select id="filterModel" class="form-select form-select-sm" onchange="filterTagsTable()">
+                                                <option value="">-- Tất cả Models --</option>
+                                                @foreach (var m in Model.Models)
+                                                {
+                                                    <option value="@m.ModelCode">@m.ModelCode</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select id="filterState" class="form-select form-select-sm" onchange="filterTagsTable()">
+                                                <option value="">-- Tất cả Trạng Thái --</option>
+                                                @foreach (var st in Model.States)
+                                                {
+                                                    <option value="@st.StateCode">[@st.StateCode] @st.StateNameVi</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 text-end">
+                                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetFilters()">
+                                                Xóa Lọc
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-striped align-middle mb-0" id="tagsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Địa Chỉ MAC</th>
+                                                    <th>Mã Máy / Vị Trí</th>
+                                                    <th>Model Đang Chạy</th>
+                                                    <th>Trạng Thái Hiện Tại</th>
+                                                    <th>Mức Pin</th>
+                                                    <th>Lần Gửi Cuối</th>
+                                                    <th>Trạng Thái Sync</th>
+                                                    <th class="text-center">Xem Trước</th>
+                                                    <th class="text-center" style="width: 250px;">Bắn Lệnh Ra Thẻ</th>
+                                                    <th class="text-center" style="width: 120px;">Thao Tác</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tagsTableBody">
+                                                @foreach (var tag in Model.Tags)
+                                                {
+                                                    <tr id="row-@tag.MacAddress" data-mac="@tag.MacAddress.ToLowerInvariant()"
+                                                        data-machine="@tag.MachineNo.ToLowerInvariant()" data-model="@tag.ModelCode"
+                                                        data-state="@tag.CurrentStateCode">
+                                                        <td class="font-monospace fw-bold text-primary">@tag.MacAddress</td>
+                                                        <td><span class="fw-semibold">@tag.MachineNo</span></td>
+                                                        <td><span class="badge bg-secondary" id="model-badge-@tag.MacAddress">@tag.ModelCode</span>
+                                                        </td>
+                                                        <td>
+                                                            @{
+                                                                var themeBadge = tag.CurrentState?.ThemeColor == "Red" ? "bg-danger" :
+                                                                                 tag.CurrentState?.ThemeColor == "Yellow" ? "bg-warning text-dark" : "bg-dark";
+                                                                var stateName = tag.CurrentState?.StateNameVi ?? $"Trạng thái {tag.CurrentStateCode}";
+                                                            }
+                                                            <span class="badge @themeBadge" id="badge-state-@tag.MacAddress">
+                                                                [@tag.CurrentStateCode] @stateName
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div class="d-flex align-items-center" style="width: 90px;">
+                                                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                                    <div class="progress-bar @(tag.BatteryLevel > 20 ? "bg-success" : "bg-danger")"
+                                                                         style="width: @(tag.BatteryLevel)%"></div>
+                                                                </div>
+                                                                <small class="text-muted">@(tag.BatteryLevel)%</small>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <small class="text-muted font-monospace" id="sync-time-@tag.MacAddress">
+                                                                @(tag.LastSyncedAt.HasValue ?
+                                                            tag.LastSyncedAt.Value.ToLocalTime().ToString("HH:mm:ss dd/MM") : "--")
+                                                            </small>
+                                                        </td>
+                                                        <td>
+                                                            @{
+                                                                var syncBadgeClass = tag.SyncStatus switch
+                                                                {
+                                                                    "Confirmed" => "bg-success",
+                                                                    "Synced" => "bg-success",
+                                                                    "Uploaded" => "bg-primary",
+                                                                    "Dispatching" => "bg-warning text-dark",
+                                                                    "Pending" => "bg-info text-dark",
+                                                                    "Error" => "bg-danger",
+                                                                    _ => "bg-secondary"
+                                                                };
+                                                            }
+                                                         <span class="badge @syncBadgeClass" id="badge-sync-@tag.MacAddress">
+                                                                @tag.SyncStatus
+                                                            </span>
+                                                        </td>
+                                            <td             class="text-center">
+                                                                   
+                                           <button class="btn btn-sm btn-outline-primary" onclick="showTagModal('@tag.MacAddress', '@tag.MachineNo', '@tag.ModelCode')">
+                                                                Xem Ảnh
+                                                            </button>
+                                                        </td>
+                                             <td            class="text-center">
+                                       <div                      class="input-group input-group-sm">
+                                                <select class="form-select form-select-sm" id="select-state-@tag.MacAddress">
+                                                                    @foreach (var st in Model.States)
+                                                               {     
+                                                                                               
+                                                               <!option value="@st.StateCode" @(st.StateCode == tag.CurrentStateCode ? "selected" : "")>
+                                                                            [@st.StateCode] @st.StateNameVi
+                                                                        </!option>
+                                                                    }
+                                                                </select>
+                                                                       
+                                                    <button class="btn btn-success btn-sm px-2 fw-semibold" onclick="dispatchTag('@tag.MacAddress')" id="btn-send-@tag.MacAddress">
+                                                                    Bắn Thẻ
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                      <td   class="text-center">
+                                                 <div            class="btn-group btn-group-sm">
+                                                                       
+                                                          <button class="btn btn-outline-secondary btn-sm" title="Sửa ghép nối" onclick="editTagLink('@tag.MacAddress', '@tag.MachineNo', '@tag.ModelCode', @tag.CurrentStateCode)">
+                                                                    ✏️
+                                                                </button>
+                                                                       
+                                                           <button class="btn btn-outline-danger btn-sm" title="Hủy ghép thẻ" onclick="unlinkTag('@tag.MacAddress')">
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+</div>
+                        
+                        <!-- Modal 1: Live Preview Image -->
+   <div                      class="modal fade" id="tagModal" tabindex="-1" aria-hidden="true">
+            <div                 class="modal-dialog modal-dialog-centered">
+                     <div            class="modal-content">
+                              <div       class="modal-header">
+                                        <h5 class="modal-title fw-bold" id="modalTitle">Xem Trước Thẻ Nhãn</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                     <div                class="modal-body text-center bg-light">
+                                            
+                                        <img id="modalImg" src="" alt="Preview" class="border rounded shadow-sm" style="width: 400px; height: 300px; object-fit: contain; background: white;" />
+                                    </div>
+                    <div                 class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                    </div>
+                                </div>
+                            </div>
+</div>
+                        
+                        <!-- Modal 2: Link / ReLink Tag Modal -->
+               <div          class="modal fade" id="linkTagModal" tabindex="-1" aria-hidden="true">
+                        <div     class="modal-dialog modal-dialog-centered">
+                   <div              class="modal-content">
+             <div                        class="modal-header bg-primary text-white">
+                                        <h5 class="modal-title fw-bold" id="linkModalTitle">🔗 Ghép Nối Thẻ E-Tag</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                 <div    class="modal-body">
+                            <form id="linkForm" onsubmit="return false;">
+                      <div                       class="mb-3">
+                                                <label class="form-label fw-semibold">Địa chỉ MAC của Thẻ (8 ký tự Hex):</label>
+                                                      
+                                                <input type="text" id="linkMac" class="form-control font-monospace text-uppercase" placeholder="Ví dụ: B4B819DE" required />
+                                                <small class="text-muted">Địa chỉ MAC in trên mặt sau của thẻ Opticon SE420RY</small>
+                                            </div>
+                      <div                       class="mb-3">
+                                                <label class="form-label fw-semibold">Mã Máy / Vị Trí Làm Việc:</label>
+                                                      
+                                                <input type="text" id="linkMachine" class="form-control" placeholder="Ví dụ: 38 hoặc LINE1-M01" required />
+                                            </div>
+                               <div              class="mb-3">
+                                                <label class="form-label fw-semibold">Model Sản Phẩm:</label>
+                              <div                   class="input-group">
+                                       <select id="linkModelSelect" class="form-select" onchange="onLinkModelSelectChange()">
+                                                        <option value="">-- Chọn Model có sẵn --</option>
+                                                        @foreach (var m in Model.Models)
+                                            {            
+                                                            <option value="@m.ModelCode">@m.ModelCode</option>
+                                                        }
+                                                        <option value="__custom__">+ Nhập Model mới...</option>
+                                                    </select>
+                                                </div>
+                                                      
+                                                <input type="text" id="linkModelCustom" class="form-control mt-2 d-none" placeholder="Nhập tên Model mới..." />
+                                            </div>
+                               <div              class="mb-3">
+                                                <label class="form-label fw-semibold">Trạng Thái Khởi Tạo:</label>
+                                             <select id="linkState" class="form-select">
+                                                    @foreach (var st in Model.States)
+                              {                      
+                                                        <option value="@st.StateCode">[@st.StateCode] @st.StateNameVi (@st.StateNameKo)</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                 <div            class="form-check mb-3">
+                                                <input class="form-check-input" type="checkbox" id="linkAutoDispatch" checked>
+                                <label class="form-check-label fw-semibold" for="linkAutoDispatch">
+                                                    Tự động render và bắn ngay sang trạm EBS-50 sau khi ghép nối
+                                                </label>
+                                            </div>
+                                        </form>
+                                    </div>
+                      <div               class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                               
+                 <button type="button" class="btn btn-primary px-4 fw-semibold" onclick="submitLinkTag()" id="btnSubmitLink">
+                                            <span id="spinnerLink" class="spinner-border spinner-border-sm d-none me-1"></span>
+                                            Lưu Ghép Thẻ
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+</div>
+                        
+                        <!-- Modal 3: Machine State & Icon Configuration Modal -->
+                 <div        class="modal fade" id="stateSettingsModal" tabindex="-1" aria-hidden="true">
+                          <div   class="modal-dialog modal-dialog-centered modal-lg">
+                     <div            class="modal-content">
+               <div                      class="modal-header bg-dark text-white">
+                                        <h5 class="modal-title fw-bold">🎨 Cấu Hình Trạng Thái Máy & Icon</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                <div                         class="row g-4">
+                         <div                    class="col-md-6 border-end">
+                                  <div               class="mb-3">
+                                                    <label class="form-label fw-semibold">Chọn Trạng Thái Cần Cấu Hình:</label>
+                                                <select id="stateSelectConfig" class="form-select" onchange="loadSelectedStateConfig()">
+                                                        @foreach (var st in Model.States)
+                                 {                       
+                                                                   
+                                               <option value="@st.StateCode" data-vi="@st.StateNameVi" data-ko="@st.StateNameKo" data-color="@st.ThemeColor" data-icon="@st.IconFileName">
+                                                                [@st.StateCode] @st.StateNameVi
+                                                            </option>
+                                                        }
+                                                        <option value="__new__" class="fw-bold text-success">+ Thêm Trạng Thái Mới...</option>
+                                                    </select>
+                                                </div>
+                           <div                      class="mb-3 d-none" id="newStateCodeContainer">
+                                                    <label class="form-label fw-semibold text-success">Mã Trạng Thái Mới (Số nguyên):</label>
+                                                    <input type="number" id="stateCodeNewInput" class="form-control" min="0" max="999" value="5" />
+                                                    <small class="text-muted">Gợi ý mã trạng thái tiếp theo chưa được sử dụng</small>
+                                                </div>
+                                     <div            class="mb-3">
+                                                    <label class="form-label fw-semibold">Tên Trạng Thái (Tiếng V
+                                    i                      ệt):</label>
+                                                    <input type="text" id="stateNameViInput" class="form-control" placeholder="Ví dụ: Bảo trì định kỳ (PM)..." />
+                                                </div>
+                                         <div        class="mb-3">
+                                                    <label class="form-label fw-semibold">Tên Trạng Thái (Tiếng H
+                                                       à   n):</label>
+                                                    <input type="text" id="stateNameKoInput" class="form-control" placeholder="Ví dụ: 정기 점검..." />
+                                                </div>
+                               <div                  class="mb-3">
+                                                    <label class="form-label fw-semibold">Màu Chủ Đạo E-Paper:</label>
+                                             <select id="stateThemeColorInput" class="form-select">
+                                                        <option value="Black">Đen (Black)</option>
+                                                        <option value="Red">Đỏ (Red)</option>
+                                                        <option value="Yellow">Vàng (Yellow)</option>
+                                                    </select>
+                                                </div>
+                                          <div       class="d-flex gap-2">
+                                                           
+                                                 <button type="button" class="btn btn-primary flex-grow-1 fw-semibold" id="btnSaveState" onclick="saveStateAction()">
+                                                        Lưu Thông Tin Trạng Thái
+                                                    </button>
+                                                           
+                                 <button type="button" class="btn btn-outline-danger fw-semibold d-none" id="btnDeleteState" onclick="deleteCurrentState()">
+                                                        🗑️ Xóa
+                                                    </button>
+                                                </div>
+                    </div>
+                        
+                      <div                       class="col-md-6 text-center">
+                                                <label class="form-label fw-semibold d-block mb-2">Ảnh Icon E-Paper (PNG 400x300):</label>
+                                    <div             class="p-2 border rounded bg-light mb-3 d-inline-block shadow-sm">
+                                                        
+                                                        
+                                                    <img id="stateIconPreview" src="/api/states/0/icon" alt="Icon Preview" style="width: 240px; height: 180px; object-fit: contain; background: white;" class="border rounded" />
+                                                </div>
+                        <div                         class="mb-3 text-start">
+                                                       
+                                                        <label class="form-label small fw-semibold" id="iconFileInputLabel">Tải lên ico
+       n                                                        mới:</label>
+                                                        <input type="file" id="stateIconFileInput" class="form-control form-control-sm" accept=".png,.jpg,.bmp" onchange="previewSelectedIconFile(event)" />
+                                                        <small class="text-muted">Định dạng: PNG tỷ lệ 4:3 (400 x 300 px), nền trắng.</small>
+                                                    </div>
+                                                           
+                             <button type="button" class="btn btn-success w-100 fw-semibold" onclick="uploadStateIconFile()" id="btnUploadIcon">
+                                                        <span id="spinnerUploadIcon" class="spinner-border spinner-border-sm d-none me-1"></span>
+                                                        Tải Icon Lên Hệ Thống
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                        <div                 class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                        </div>
+                                    </div>
+                                </div>
+</div>
+                            
+                            <!-- Modal 4: Models Management Modal -->
+                    <div         class="modal fade" id="modelsModal" tabindex="-1" aria-hidden="true">
+                         <div        class="modal-dialog modal-dialog-centered">
+                              <div       class="modal-content">
+                                   <div      class="modal-header bg-dark text-white">
+                                            <h5 class="modal-title fw-bold">📦 Quản Lý Danh Mục Models</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                       <div  class="modal-body">
+                                            <!-- Add Model Form -->
+                <form id="addModelForm" onsubmit="return false;" class="mb-4 p-3 bg-light rounded border">
+                                                <h6 class="fw-bold mb-2">Thêm Model Mới:</h6>
+                      <div                           class="row g-2 mb-2">
+                           <div                          class="col-7">
+                                                              
+                                                        <input type="text" id="newModelCode" class="form-control form-control-sm" placeholder="Mã Model (VD: A55/M55)..." required />
+                                                    </div>
+                         <div                            class="col-5">
+                              <button class="btn btn-success btn-sm w-100 fw-semibold" onclick="addNewModel()">
+                                                            + Thêm Mới
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                      
+                                                <input type="text" id="newModelDesc" class="form-control form-control-sm" placeholder="Mô tả sản phẩm (tùy chọn)..." />
+                </form>
+                            
+                                            <!-- Models List -->
+                                            <h6 class="fw-bold mb-2">Danh Sách Model Hiện Có:</h6>
+                               <div              class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered align-middle">
+                                         <thead class="table-light">
+                                              <tr>          
+                                                            <th>Mã Model</th>
+                                                            <th>Mô Tả</th>
+                                                            <th class="text-center" style="width: 50px;">Xóa</th>
+                                                        </tr>
+                                                    </thead>
+                                                <tbody> id="modelsTableBody">
+                                                        @foreach (var m in Model.Models)
+                                                      {  
+                                                           <tr  id="model-row-@m.ModelCode">
+                                                                <td class="fw-semibold">@m.ModelCode</td>
+                                                                <td class="small text-muted">@m.Description</td>
+                                     <td                            class="text-center">
+                                                                           
+                                                                    <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteModel('@m.ModelCode')">×</button>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                  <div       class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                        </div>
+                                    </div>
+                                </div>
+</div>
+                            
+                            <!-- Modal 5: Config EBS-50 Connection -->
+ <div                            class="modal fade" id="configModal" tabindex="-1" aria-hidden="true">
+      <div                           class="modal-dialog modal-dialog-centered">
+           <div                          class="modal-content">
+                <div                         class="modal-header">
+                                            <h5 class="modal-title fw-bold">⚙️ Cấu Hình Kết Nối EBS-50 (SFTP)</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                    <div                     class="modal-body">
+                         <form id="configForm" onsubmit="return false;">
+                              <div                   class="mb-3">
+                                                    <label class="form-label fw-semibold">Địa chỉ IP / Hostname EBS-50:</label>
+                                                    <input type="text" id="cfgHost" class="form-control" placeholder="192.168.11.36 hoặc ebs50.local" />
+                                                </div>
+                                 <div                class="row g-2 mb-3">
+                                      <div               class="col-md-6">
+                                                        <label class="form-label fw-semibold">Cổng SSH (Port):</label>
+                                                        <input type="number" id="cfgPort" class="form-control" value="22" />
+                                                    </div>
+                                          <div           class="col-md-6">
+                                                        <label class="form-label fw-semibold">Tên đăng nhập:</label>
+                                                        <input type="text" id="cfgUser" class="form-control" value="root" />
+                                                    </div>
+                                                </div>
+                                           <div      class="mb-3">
+                                                    <label class="form-label fw-semibold">Mật khẩu SSH (để trống nếu không có):</label>
+                                                    <input type="password" id="cfgPass" class="form-control" placeholder="Mật khẩu SSH/SFTP..." />
+                                                </div>
+                                               <div  class="mb-3">
+                                                    <label class="form-label fw-semibold">Thư mục Input trên EBS-50:</label>
+                                                    <input type="text" id="cfgPath" class="form-control" value="/home/root/ebs_50_run/Input" />
+                                                </div>
+                                            </form>
+                                        </div>
+                 <div                        class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                               
+                                                <button type="button" class="btn btn-primary px-4 fw-semibold" onclick="saveConfig()">Lưu Cấu Hình</button>
+                                            </div>
+                                        </div>
+                                    </div>
+</div>
+                                
+  <script>
+                                function showAlert(msg, isSuccess = true) {
+                                        const box = document.getElementById('alertBox');
+                                        const span = document.getElementById('alertMessage');
+                                        span.innerText = msg;
+                                        box.className = `alert alert-dismissible fade show mb-3 shadow-sm ${isSuccess ? 'alert-success' : 'alert-danger'}`;
+                                        box.classList.remove('d-none');
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+                                
+                                    // Client-side instant filter on E-Tags table
+                                   function filterTagsTable() {
+                                        const searchVal = document.getElementById('filterSearch').value.toLowerCase().trim();
+                                        const modelVal = document.getElementById('filterModel').value;
+        const stateVal = document.getElementById('filterState').value;
+                                
+                                        const rows = document.querySelectorAll('#tagsTableBody tr');
+                        rows.forEach(row => {
+                                            const mac = row.getAttribute('data-mac') || '';
+                                            const machine = row.getAttribute('data-machine') || '';
+                                            const model = row.getAttribute('data-model') || '';
+            const state = row.getAttribute('data-state') || '';
+                                
+                                            const matchSearch = !searchVal || mac.includes(searchVal) || machine.includes(searchVal);
+                                            const matchModel = !modelVal || model === modelVal;
+            const matchState = !stateVal || state === stateVal;
+                                
+                                  if (matchSearch && matchModel && matchState) {
+                                                row.classList.remove('d-none');
+                            } else {
+                                                row.classList.add('d-none');
+                                            }
+                                        });
+    }
+                                
+                                  function resetFilters() {
+                                        document.getElementById('filterSearch').value = '';
+                                        document.getElementById('filterModel').value = '';
+                                        document.getElementById('filterState').value = '';
+                                        filterTagsTable();
+    }
+                                
+                                    // Modal 1: Tag preview
+             function showTagModal(mac, machine, model) {
+                                        document.getElementById('modalTitle').innerText = `Thẻ MAC: ${mac} (Máy: ${machine} - Model: ${model})`;
+                                        const timestamp = new Date().getTime();
+                                        document.getElementById('modalImg').src = `/api/render/preview/${mac}?_t=${timestamp}`;
+                                        const modal = new bootstrap.Modal(document.getElementById('tagModal'));
+                                        modal.show();
+    }
+                                
+                                    // Modal 2: Link / ReLink Tag
+                  function openLinkModal() {
+                                        document.getElementById('linkModalTitle').innerText = '🔗 Ghép Nối Thẻ E-Tag Mới';
+                                        document.getElementById('linkMac').value = '';
+                                        document.getElementById('linkMac').removeAttribute('readonly');
+                                        document.getElementById('linkMachine').value = '';
+                                        document.getElementById('linkModelSelect').value = '';
+                                        document.getElementById('linkModelCustom').value = '';
+                                        document.getElementById('linkModelCustom').classList.add('d-none');
+        document.getElementById('linkAutoDispatch').checked = true;
+                                
+                                        const modal = new bootstrap.Modal(document.getElementById('linkTagModal'));
+                                        modal.show();
+    }
+                                
+            function editTagLink(mac, machine, model, state) {
+                                        document.getElementById('linkModalTitle').innerText = `✏️ Sửa Ghép Thẻ: ${mac}`;
+                                        document.getElementById('linkMac').value = mac;
+                                        document.getElementById('linkMac').setAttribute('readonly', 'true');
+        document.getElementById('linkMachine').value = machine;
+                                
+                                        const modelSelect = document.getElementById('linkModelSelect');
+                            if ([...modelSelect.options].some(o => o.value === model)) {
+                                            modelSelect.value = model;
+                                            document.getElementById('linkModelCustom').classList.add('d-none');
+                   } else {
+                                            modelSelect.value = '__custom__';
+                                            document.getElementById('linkModelCustom').value = model;
+                                            document.getElementById('linkModelCustom').classList.remove('d-none');
+        }
+                                
+                                        document.getElementById('linkState').value = state;
+        document.getElementById('linkAutoDispatch').checked = true;
+                                
+                                        const modal = new bootstrap.Modal(document.getElementById('linkTagModal'));
+                                        modal.show();
+    }
+                                
+              function onLinkModelSelectChange() {
+                                        const sel = document.getElementById('linkModelSelect').value;
+                                        const customInput = document.getElementById('linkModelCustom');
+                                       if (sel === '__custom__') {
+                                            customInput.classList.remove('d-none');
+                                            customInput.focus();
+                              } else {
+                                            customInput.classList.add('d-none');
+                                        }
+    }
+                                
+              async function submitLinkTag() {
+                                        const mac = document.getElementById('linkMac').value.trim().toUpperCase();
+                                        const machine = document.getElementById('linkMachine').value.trim();
+                                        let model = document.getElementById('linkModelSelect').value;
+                                   if (model === '__custom__') {
+                                            model = document.getElementById('linkModelCustom').value.trim();
+                                        }
+                                        const state = parseInt(document.getElementById('linkState').value);
+        const autoDispatch = document.getElementById('linkAutoDispatch').checked;
+                                
+                    if (!mac || !machine || !model) {
+                                            alert('Vui lòng điền đầy đủ Địa chỉ MAC, Mã Máy và Model.');
+                                            return;
+        }
+                                
+                                        const btn = document.getElementById('btnSubmitLink');
+                                        const spinner = document.getElementById('spinnerLink');
+                                        btn.disabled = true;
+        spinner.classList.remove('d-none');
+                                
+                         try                {
+                          const resp = await fetch('/api/tags/link', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                                                    macAddress: mac,
+                                                    machineNo: machine,
+                                                    modelCode: model,
+                                                    initialStateCode: state,
+                                                    autoDispatch: autoDispatch
+                                                })
+            });
+                                
+                                            const result = await resp.json();
+                    if (resp.ok && result.success) {
+                                                bootstrap.Modal.getInstance(document.getElementById('linkTagModal')).hide();
+                                                showAlert(result.message, true);
+                                                setTimeout(() => window.location.reload(), 1000);
+                                      } else {
+                                                showAlert(`Lỗi ghép thẻ: ${result.message || JSON.stringify(result)}`, false);
+                                            }
+                         } catch (err) {
+                                            showAlert(`Lỗi mạng: ${err}`, false);
+                   } finally {
+                                            btn.disabled = false;
+                                            spinner.classList.add('d-none');
+                                        }
+    }
+                                
+                             async function unlinkTag(mac) {
+        if (!confirm(`Bạn có chắc muốn hủy ghép nối và xóa thẻ MAC ${mac} không?`)) return;
+                                
+                           try              {
+                                            const resp = await fetch(`/api/tags/${mac}`, { method: 'DELETE' });
+                                            const result = await resp.json();
+                       if (resp.ok && result.success) {
+                                                const row = document.getElementById(`row-${mac}`);
+                                                if (row) row.remove();
+                                                showAlert(result.message, true);
+                                        } else {
+                                                showAlert(`Lỗi: ${result.message}`, false);
+                                            }
+                           } catch (err) {
+                                            showAlert(`Lỗi: ${err}`, false);
+                                        }
+    }
+                                
+                                    // Modal 3: State Settings & Icon Upload
+        function openStateSettingsModal() {
+                                        loadSelectedStateConfig();
+                                        const modal = new bootstrap.Modal(document.getElementById('stateSettingsModal'));
+                                        modal.show();
+    }
+                                
+                      function loadSelectedStateConfig() {
+                                        const sel = document.getElementById('stateSelectConfig');
+                                        const opt = sel.options[sel.selectedIndex];
+        if (!opt) return;
+                                
+                                        const isNew = sel.value === '__new__';
+                                        const newCodeContainer = document.getElementById('newStateCodeContainer');
+                                        const btnSave = document.getElementById('btnSaveState');
+                                        const btnDelete = document.getElementById('btnDeleteState');
+                                        const btnUpload = document.getElementById('btnUploadIcon');
+        const iconLabel = document.getElementById('iconFileInputLabel');
+                                
+                         if (isNew) {
+                                            newCodeContainer.classList.remove('d-none');
+                                            // Calculate next available integer code
+                     const existingCodes = [...sel.options]
+                                                .map(o => parseInt(o.value))
+                                                .filter(n => !isNaN(n));
+                                            const nextCode = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 5;
+            document.getElementById('stateCodeNewInput').value = nextCode;
+                                
+                                            document.getElementById('stateNameViInput').value = '';
+                                            document.getElementById('stateNameKoInput').value = '';
+                                            document.getElementById('stateThemeColorInput').value = 'Black';
+            document.getElementById('stateIconPreview').src = '/api/states/0/icon';
+                                
+                                            btnSave.innerText = '+ Tạo Trạng Thái Mới';
+                                            btnSave.className = 'btn btn-success flex-grow-1 fw-semibold';
+                                            btnDelete.classList.add('d-none');
+                                            btnUpload.classList.add('d-none');
+                                            iconLabel.innerText = 'Chọn icon cho trạng thái mới:';
+                                  } else {
+                                            newCodeContainer.classList.add('d-none');
+            const stateCode = parseInt(sel.value);
+                                
+                                            document.getElementById('stateNameViInput').value = opt.getAttribute('data-vi') || '';
+                                            document.getElementById('stateNameKoInput').value = opt.getAttribute('data-ko') || '';
+            document.getElementById('stateThemeColorInput').value = opt.getAttribute('data-color') || 'Black';
+                                
+            document.getElementById('stateIconPreview').src = `/api/states/${stateCode}/icon?_t=${new Date().getTime()}`;
+                                
+                                            btnSave.innerText = 'Lưu Thông Tin Trạng Thái';
+                                            btnSave.className = 'btn btn-primary flex-grow-1 fw-semibold';
+                                            btnUpload.classList.remove('d-none');
+            iconLabel.innerText = 'Tải lên icon mới:';
+                                
+                                  if (stateCode > 4) {
+                                                btnDelete.classList.remove('d-none');
+                            } else {
+                                                btnDelete.classList.add('d-none');
+                                            }
+                                        }
+    }
+                                
+                                   async function saveStateAction() {
+                                        const sel = document.getElementById('stateSelectConfig');
+                                 if (sel.value === '__new__') {
+                                            await createNewState();
+                           } else {
+                                            await saveStateMetadata();
+                                        }
+    }
+                                
+           async function createNewState() {
+                                        const codeInput = document.getElementById('stateCodeNewInput').value.trim();
+                                        const nameVi = document.getElementById('stateNameViInput').value.trim();
+                                        const nameKo = document.getElementById('stateNameKoInput').value.trim();
+                                        const themeColor = document.getElementById('stateThemeColorInput').value;
+        const fileInput = document.getElementById('stateIconFileInput');
+                                
+                          if (!codeInput || isNaN(parseInt(codeInput))) {
+                                            alert('Mã trạng thái phải là số nguyên hợp lệ.');
+                                            return;
+                                        }
+              if (!nameVi || !nameKo) {
+                                            alert('Vui lòng điền đầy đủ Tên tiếng Việt và Tên tiếng Hàn.');
+                                            return;
+        }
+                                
+                                        const formData = new FormData();
+                                        formData.append('StateCode', parseInt(codeInput));
+                                        formData.append('StateNameVi', nameVi);
+                                        formData.append('StateNameKo', nameKo);
+        formData.append('ThemeColor', themeColor);
+                                
+                 if (fileInput.files && fileInput.files.length > 0) {
+                                            formData.append('iconFile', fileInput.files[0]);
+        }
+                                
+                                        const btn = document.getElementById('btnSaveState');
+                                        btn.disabled = true;
+        btn.innerText = 'Đang khởi tạo...';
+                                
+                            try             {
+                             const resp = await fetch('/api/states', {
+                                                method: 'POST',
+                                                body: formData
+            });
+                                
+                                            const result = await resp.json();
+              if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                setTimeout(() => window.location.reload(), 1000);
+                                   } else {
+                                                alert(`Lỗi tạo trạng thái: ${result.message || JSON.stringify(result)}`);
+                                            }
+                      } catch (err) {
+                                            alert(`Lỗi kết nối: ${err}`);
+                } finally {
+                                            btn.disabled = false;
+                                            btn.innerText = '+ Tạo Trạng Thái Mới';
+                                        }
+    }
+                                
+                          async function deleteCurrentState() {
+                                        const sel = document.getElementById('stateSelectConfig');
+                                        const stateCode = parseInt(sel.value);
+        if (isNaN(stateCode) || stateCode <= 4) return;
+                                
+        if (!confirm(`Bạn có chắc muốn xóa Trạng thái [${stateCode}] không?`)) return;
+                                
+                try                         {
+                                            const resp = await fetch(`/api/states/${stateCode}`, { method: 'DELETE' });
+                                            const result = await resp.json();
+                                        if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                setTimeout(() => window.location.reload(), 1000);
+                               } else {
+                                                alert(`Lỗi xóa trạng thái: ${result.message}`);
+                                            }
+                  } catch (err) {
+                                            alert(`Lỗi kết nối: ${err}`);
+                                        }
+    }
+                                
+                               async function saveStateMetadata() {
+                                        const stateCode = parseInt(document.getElementById('stateSelectConfig').value);
+                                        const nameVi = document.getElementById('stateNameViInput').value.trim();
+                                        const nameKo = document.getElementById('stateNameKoInput').value.trim();
+        const themeColor = document.getElementById('stateThemeColorInput').value;
+                                
+                    if (!nameVi || !nameKo) {
+                                            alert('Tên tiếng Việt và Hàn không được để trống.');
+                                            return;
+        }
+                                
+        try                                 {
+                                      const resp = await fetch(`/api/states/${stateCode}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                                    stateNameVi: nameVi,
+                                                    stateNameKo: nameKo,
+                                                    themeColor: themeColor
+                                                })
+            });
+                                
+                                            const result = await resp.json();
+                                      if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                setTimeout(() => window.location.reload(), 1000);
+                             } else {
+                                                alert(`Lỗi: ${result.message}`);
+                                            }
+                } catch (err) {
+                                            alert(`Lỗi: ${err}`);
+                                        }
+    }
+                                
+                              function previewSelectedIconFile(event) {
+                                        const file = event.target.files[0];
+                            if (file) {
+                                            const reader = new FileReader();
+                          reader.onload = e => {
+                                                document.getElementById('stateIconPreview').src = e.target.result;
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+    }
+                                
+                             async function uploadStateIconFile() {
+                                        const sel = document.getElementById('stateSelectConfig');
+        if (sel.value === '__new__') return;
+                                
+                                        const stateCode = parseInt(sel.value);
+                                        const fileInput = document.getElementById('stateIconFileInput');
+                   if (!fileInput.files || fileInput.files.length === 0) {
+                                            alert('Vui lòng chọn một file ảnh để tải lên.');
+                                            return;
+        }
+                                
+                                        const btn = document.getElementById('btnUploadIcon');
+                                        const spinner = document.getElementById('spinnerUploadIcon');
+                                        btn.disabled = true;
+        spinner.classList.remove('d-none');
+                                
+                                        const formData = new FormData();
+        formData.append('iconFile', fileInput.files[0]);
+                                
+                  try                       {
+                   const resp = await fetch(`/api/states/${stateCode}/icon`, {
+                                                method: 'POST',
+                                                body: formData
+            });
+                                
+                                            const result = await resp.json();
+                                 if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                document.getElementById('stateIconPreview').src = `/api/states/${stateCode}/icon?_t=${new Date().getTime()}`;
+                                                setTimeout(() => window.location.reload(), 1000);
+                     } else {
+                                                alert(`Lỗi tải ảnh: ${result.message}`);
+                                            }
+                                     } catch (err) {
+                                            alert(`Lỗi: ${err}`);
+                               } finally {
+                                            btn.disabled = false;
+                                            spinner.classList.add('d-none');
+                                        }
+    }
+                                
+                                    // Modal 4: Models Management
+          function openModelsModal() {
+                                        const modal = new bootstrap.Modal(document.getElementById('modelsModal'));
+                                        modal.show();
+    }
+                                
+                           async function addNewModel() {
+                                        const code = document.getElementById('newModelCode').value.trim();
+                                        const desc = document.getElementById('newModelDesc').value.trim();
+                      if (!code) {
+                                            alert('Vui lòng nhập Mã Model.');
+                                            return;
+        }
+                                
+           try                              {
+                                         const resp = await fetch('/api/models', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ modelCode: code, description: desc })
+            });
+                                
+                                            const result = await resp.json();
+                       if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                setTimeout(() => window.location.reload(), 800);
+                                           } else {
+                                                alert(`Lỗi: ${result.message}`);
+                                            }
+                               } catch (err) {
+                                            alert(`Lỗi: ${err}`);
+                                        }
+    }
+                                
+               async function deleteModel(code) {
+        if (!confirm(`Bạn có chắc muốn xóa Model ${code} không?`)) return;
+                                
+             try                            {
+                                            const resp = await fetch(`/api/models/${encodeURIComponent(code)}`, { method: 'DELETE' });
+                                            const result = await resp.json();
+                                     if (resp.ok && result.success) {
+                                                const row = document.getElementById(`model-row-${code}`);
+                                                if (row) row.remove();
+                                                showAlert(result.message, true);
+                         } else {
+                                                alert(`Lỗi: ${result.message}`);
+                                            }
+            } catch (err) {
+                                            alert(`Lỗi: ${err}`);
+                                        }
+    }
+                                
+                                    // Modal 5: EBS-50 Config & SFTP Test
+                      async function openConfigModal() {
+                       try                  {
+                                            const resp = await fetch('/api/dispatch/config');
+                     if (resp.ok) {
+                                                const cfg = await resp.json();
+                                                document.getElementById('cfgHost').value = cfg.host || '192.168.11.36';
+                                                document.getElementById('cfgPort').value = cfg.port || 22;
+                                                document.getElementById('cfgUser').value = cfg.username || 'root';
+                                                document.getElementById('cfgPass').value = cfg.password || '';
+                                                document.getElementById('cfgPath').value = cfg.remotePath || '/home/root/ebs_50_run/Input';
+                                            }
+                       } catch (e) {
+                                            console.error(e);
+                                        }
+                                        const modal = new bootstrap.Modal(document.getElementById('configModal'));
+                                        modal.show();
+    }
+                                
+                              async function saveConfig() {
+                               const payload = {
+                                            host: document.getElementById('cfgHost').value.trim(),
+                                            port: parseInt(document.getElementById('cfgPort').value),
+                                            username: document.getElementById('cfgUser').value.trim(),
+                                            password: document.getElementById('cfgPass').value,
+                                            remotePath: document.getElementById('cfgPath').value.trim()
+        };
+                                
+                                        try {
+            const resp = await fetch('/api/dispatch/config', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify(payload)
+                                            });
+                                            const data = await resp.json();
+                       if (resp.ok) {
+                                                bootstrap.Modal.getInstance(document.getElementById('configModal')).hide();
+                                                showAlert(data.message, true);
+              } else {
+                                                alert('Lỗi lưu cấu hình: ' + (data.message || JSON.stringify(data)));
+                                            }
+                               } catch (e) {
+                                            alert('Lỗi kết nối: ' + e);
+                                        }
+    }
+                                
+               async function testSftpConnection() {
+                                        const btn = document.getElementById('btnTestSftp');
+                                        const spinner = document.getElementById('spinnerTest');
+                                        btn.disabled = true;
+        spinner.classList.remove('d-none');
+                                
+                                 try        {
+                                            const resp = await fetch('/api/dispatch/test-connection', { method: 'POST' });
+                                            const result = await resp.json();
+                            if (result.success) {
+                                                showAlert(`[SFTP Test]: ${result.message}`, true);
+                      } else {
+                                                showAlert(`[SFTP Test]: ${result.message}`, false);
+                                            }
+         } catch (err) {
+                                            showAlert(`Lỗi kết nối kiểm tra: ${err}`, false);
+                                } finally {
+                                            btn.disabled = false;
+                                            spinner.classList.add('d-none');
+                                        }
+    }
+                                
+                                    // Tag Dispatching
+          async function dispatchTag(mac) {
+                                        const select = document.getElementById(`select-state-${mac}`);
+                                        const newState = parseInt(select.value);
+        const btn = document.getElementById(`btn-send-${mac}`);
+                                
+                                        btn.disabled = true;
+        btn.innerText = 'Đang gửi...';
+                                
+                          try               {
+                           const resp = await fetch(`/api/tags/${mac}/state`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ stateCode: newState })
+            });
+                                
+                                            const result = await resp.json();
+                                      if (resp.ok && result.success) {
+                                                showAlert(result.message, true);
+                                                const syncBadge = document.getElementById(`badge-sync-${mac}`);
+                                 if (syncBadge) {
+                                                    syncBadge.innerText = 'Pending';
+                                                    syncBadge.className = 'badge bg-info text-dark';
+                                                }
+                                                const stateBadge = document.getElementById(`badge-state-${mac}`);
+                   if (stateBadge) {
+                                                    const themeColor = result.data.themeColor;
+                                                    const badgeClass = themeColor === 'Red' ? 'bg-danger' : (themeColor === 'Yellow' ? 'bg-warning text-dark' : 'bg-dark');
+                                                    stateBadge.className = `badge ${badgeClass}`;
+                                                    stateBadge.innerText = `[${result.data.stateCode}] ${result.data.stateNameVi}`;
+                                                }
+                          } else {
+                                                showAlert(`Lỗi bắn thẻ: ${result.message || JSON.stringify(result)}`, false);
+                                            }
+             } catch (err) {
+                                            showAlert(`Lỗi kết nối: ${err}`, false);
+                                     } finally {
+                                            btn.disabled = false;
+                                            btn.innerText = 'Bắn Thẻ';
+                                        }
+    }
+                                
+                  async function syncAllTags() {
+        if (!confirm('Bạn có chắc muốn đồng bộ toàn bộ thẻ nhãn ra trạm EBS-50 không?')) return;
+                                
+                                        const btn = document.getElementById('btnSyncAll');
+                                        const spinner = document.getElementById('spinnerSyncAll');
+                                        btn.disabled = true;
+        spinner.classList.remove('d-none');
+                                
+                                 try        {
+                                            const resp = await fetch('/api/dispatch/send-all', { method: 'POST' });
+                                            const data = await resp.json();
+                                            showAlert(`Đã đưa toàn bộ ${data.totalTags} thẻ vào hàng đợi gửi SFTP sang router EBS-50!`, true);
+                     } catch (err) {
+                                            showAlert(`Lỗi: ${err}`, false);
+               } finally {
+                                            btn.disabled = false;
+                                            spinner.classList.add('d-none');
+                                        }
+    }
+                                
+                         function updateSimulator() {
+                                        const model = encodeURIComponent(document.getElementById('simModel').value || 'A27/M47/F70');
+                                        const state = document.getElementById('simState').value;
+                                        const color = document.querySelector('input[name="simColor"]:checked')?.value || 'Red';
+                                        const timestamp = new Date().getTime();
+                                        document.getElementById('simPreviewImg').src = `/api/render/simulate?model=${model}&state=${state}&color=${color}&_t=${timestamp}`;
+                                    }
+</script>
