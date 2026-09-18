@@ -1,0 +1,28 @@
+## Build and Publish outputs
+[Bb]in/
+[Oo]bj/
+publish/
+dist/
+output_test/
+
+## IDE / Editor files
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svclog
+
+## Logs
+*.log
+*.crash
+crashdump.dmp
+
+## OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
