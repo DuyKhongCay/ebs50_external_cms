@@ -4,6 +4,20 @@
 
 Đối chiếu: 18/09/2026. Backend dùng Controllers và Swashbuckle; không cần chuyển sang Minimal API để dùng Swagger.
 
+## Desktop dashboard
+
+The desktop dashboard shows tag and model totals, an E-Paper preview, and a tag
+list with machine statuses, battery levels, and synchronization statuses.
+
+![EBS50 desktop dashboard with E-Paper preview and tag management](docs/images/pc_web_ui.png)
+
+## Mobile interface
+
+The mobile interface provides tag search and filters, machine details, battery
+and synchronization statuses, image previews, and status updates.
+
+<img src="docs/images/phone_web_ui.jpg" alt="EBS50 mobile interface with tag details and status controls" width="360">
+
 ## Tài liệu
 
 | Tài liệu | Khi nào đọc |
