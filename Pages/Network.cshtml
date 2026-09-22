@@ -1,0 +1,22 @@
+@page
+@model NetworkModel
+@{
+    ViewData["Title"] = "Kết nối mạng";
+}
+<h1>Kết nối mạng</h1>
+<p>Truy cập cùng web server qua địa chỉ của từng mạng. Mở URL từ một thiết bị ở mỗi mạng để xác nhận truy cập thực tế.</p>
+<div id="network-interfaces" class="row g-3 mb-3"></div>
+<button id="network-refresh" class="btn btn-outline-secondary">Làm mới</button>
+<button id="network-diagnose" class="btn btn-primary">Kiểm tra kết nối</button>
+<button id="network-cancel" class="btn btn-outline-secondary" disabled>Hủy kiểm tra</button>
+<p id="network-message" class="mt-3" role="status" aria-live="polite"></p>
+<p class="text-muted">HTTP kiểm tra trên máy chủ không xác nhận firewall cho phép máy khác truy cập. TCP thành công chưa xác nhận đăng nhập SFTP. Kiểm tra SFTP đầy đủ tại cấu hình trạm trên Bảng điều khiển.</p>
+<div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Kiểm tra</th><th>Đích</th><th>Kết quả</th><th>Chi tiết</th><th>Thời gian</th></tr></thead>
+        <tbody id="network-results"></tbody>
+    </table>
+</div>
+@section Scripts {
+    <script src="~/js/network.js" asp-append-version="true"></script>
+}

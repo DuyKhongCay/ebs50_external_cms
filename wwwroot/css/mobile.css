@@ -1,0 +1,215 @@
+/* Mobile-first Stylesheet for EBS-50 CMS Handheld UI */
+:root {
+    --mobile-touch-target: 44px;
+    --mobile-font-input: 16px;
+    --mobile-nav-height: 56px;
+    --mobile-primary: #0d6efd;
+    --mobile-bg: #f4f6f9;
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+    background-color: var(--mobile-bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Ensure form controls do not trigger auto-zoom on iOS (font-size >= 16px) */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+    font-size: var(--mobile-font-input) !important;
+    min-height: var(--mobile-touch-target);
+}
+
+/* Base touch target utility */
+.btn-touch,
+.touch-target {
+    min-height: var(--mobile-touch-target);
+    min-width: var(--mobile-touch-target);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Fixed Bottom Navigation Bar */
+.mobile-bottom-nav {
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 1040;
+}
+
+.nav-item-btn {
+    flex: 1;
+    color: #6c757d;
+    padding: 4px 0;
+    min-height: var(--mobile-touch-target);
+}
+
+.nav-item-btn:hover,
+.nav-item-btn:focus,
+.nav-item-btn.active {
+    color: var(--mobile-primary);
+    font-weight: 600;
+}
+
+.nav-item-btn .nav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.nav-item-btn .nav-label {
+    font-size: 0.72rem;
+    margin-top: 2px;
+}
+
+/* Tag Cards List */
+.tag-card {
+    border-radius: 12px;
+    border: 1px solid #e0e4e8;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.tag-card:active {
+    background-color: #fafbfc;
+}
+
+.tag-card .card-machine-no {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+.tag-card .battery-badge {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.tag-card .info-row {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #495057;
+}
+
+.tag-card .state-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.tag-card .sync-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Live E-Tag Image Preview in 4:3 Ratio */
+.preview-container {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 1px solid #333;
+}
+
+.preview-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.preview-watermark {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Modals on Mobile: Fullscreen on small screens */
+@media (max-width: 575.98px) {
+    .modal-fullscreen-sm-down .modal-dialog {
+        width: 100vw;
+        max-width: none;
+        height: 100%;
+        margin: 0;
+    }
+
+    .modal-fullscreen-sm-down .modal-content {
+        height: 100%;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .modal-fullscreen-sm-down .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Offline & Status Notice Banners */
+.offline-banner {
+    position: sticky;
+    top: 54px;
+    z-index: 1020;
+    border-radius: 0;
+    font-size: 0.85rem;
+}
+
+/* State Option Radios in Change State Dialog */
+.state-option-item {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    min-height: var(--mobile-touch-target);
+    transition: all 0.15s ease;
+}
+
+.state-option-item:active,
+.state-option-item.selected {
+    border-color: var(--mobile-primary);
+    background-color: #e7f1ff;
+}
+
+/* Skeleton Loading Animation */
+.skeleton-box {
+    background: linear-gradient(90deg, #eceff1 25%, #f5f7f8 50%, #eceff1 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.4s infinite ease-in-out;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}

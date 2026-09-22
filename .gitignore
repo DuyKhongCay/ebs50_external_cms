@@ -4,6 +4,8 @@
 publish/
 dist/
 output_test/
+*.db.maintenance/
+*.db.restore-candidate*
 
 ## IDE / Editor files
 .vs/
@@ -26,4 +28,3 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
-

@@ -1,3 +1,4 @@
+@inject ebs50_backend.Services.Database.DatabaseMaintenanceCoordinator DatabaseMaintenance
 <!DOCTYPE html>
 <html lang="en">
 
@@ -22,37 +23,53 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
+                            <a class="nav-link text-light" asp-page="/Database">Sao lưu / Khôi phục</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-light" asp-page="/Network">Kết nối mạng</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link text-light" asp-area="" asp-page="/Index">📊 Bảng Điều Khiển</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-light" href="/swagger" target="_blank">📖 REST API Docs
-                                (Swagger)</a>
+                            <a class="nav-link text-warning fw-semibold" asp-page="/Mobile/Index">📱 Giao diện Điện
+                                thoại</a>
                             </li>
-                        </ul>
-                        <span class="navbar-text text-white-50 small">
-                            EBS-50 External CMS Mode
-                        </span>
+                            <li class="nav-item">
+                                <a class="nav-link text-light" href="/swagger" target="_blank">📖 REST API Docs
+                                    (Swagger)</a>
+                                </li>
+                            </ul>
+                            <span class="navbar-text text-white-50 small">
+                                EBS-50 External CMS Mode
+                            </span>
+                        </div>
                     </div>
-                </div>
-            </nav>
-        </header>
-        <div class="container">
-            <main role="main" class="pb-3">
-                @RenderBody()
-            </main>
-        </div>
-
-        <footer class="border-top footer text-muted">
+                </nav>
+            </header>
             <div class="container">
-                &copy; 2026 - ebs50_backend - <a asp-area="" asp-page="/Privacy">Privacy</a>
-            </div>
-        </footer>
+                <main role="main" class="pb-3">
+                    @if (DatabaseMaintenance.SyncPaused)
+                    {
+                        <div class="alert alert-warning">Đồng bộ EBS đang tạm dừng sau khôi phục database. Trạng thái tag chưa được
+                            xác minh với thiết bị. Kiểm tra cấu hình rồi tiếp tục đồng bộ tại trang Sao lưu / Khôi phục trên máy
+                            server.</div>
+                        }
+                        @RenderBody()
+                    </main>
+                </div>
 
-        <script src="~/lib/jquery/dist/jquery.min.js"></script>
-        <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-        <script src="~/js/site.js" asp-append-version="true"></script>
+                <footer class="border-top footer text-muted">
+                    <div class="container">
+                        &copy; 2026 - ebs50_backend - <a asp-area="" asp-page="/Privacy">Privacy</a>
+                    </div>
+                </footer>
 
-        @await RenderSectionAsync("Scripts", required: false)
-    </body>
+                <script src="~/lib/jquery/dist/jquery.min.js"></script>
+                <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+                <script src="~/js/site.js" asp-append-version="true"></script>
 
-</html>
+                @await RenderSectionAsync("Scripts", required: false)
+            </body>
+
+        </html>

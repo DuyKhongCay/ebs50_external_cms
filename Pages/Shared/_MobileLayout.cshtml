@@ -1,0 +1,72 @@
+@inject ebs50_backend.Services.Database.DatabaseMaintenanceCoordinator DatabaseMaintenance
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>@ViewData["Title"] - E-Tag Mobile CMS</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/mobile.css" asp-append-version="true" />
+</head>
+
+<body class="mobile-body">
+    <!-- Top Header Navigation -->
+    <header class="mobile-header sticky-top bg-dark text-white border-bottom shadow-sm">
+        <div class="container-fluid px-3 py-2 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fs-4">🏷️</span>
+                <div>
+                    <h1 class="h6 mb-0 fw-bold text-white">Opticon E-Tag Mobile</h1>
+                    <small class="text-white-50" style="font-size: 0.75rem;">EBS-50 CMS Handheld</small>
+                </div>
+            </div>
+            <div>
+                <a asp-page="/Index" class="btn btn-outline-light btn-sm px-2 py-1" style="font-size: 0.8rem;"
+                   title="Chuyển sang giao diện máy tính">
+                    🖥️ Máy tính
+                </a>
+            </div>
+        </div>
+        <!-- Alert if Sync is paused due to DB maintenance -->
+        @if (DatabaseMaintenance.SyncPaused)
+        {
+            <div class="alert alert-warning py-1 px-3 mb-0 rounded-0 border-0 small text-center" role="alert">
+                ⚠️ Đồng bộ EBS đang tạm dừng sau khôi phục. Kiểm tra trên máy chủ.
+            </div>
+        }
+    </header>
+
+    <!-- Main Content Container with bottom padding for navigation bar -->
+    <main role="main" class="mobile-content-container container-fluid px-3 pt-2 pb-5 mb-4">
+        @RenderBody()
+    </main>
+
+    <!-- Fixed Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav fixed-bottom bg-white border-top shadow-lg" aria-label="Mobile navigation">
+        <div class="d-flex justify-content-around align-items-center py-1">
+            <button type="button" class="btn btn-link text-decoration-none text-center nav-item-btn active"
+                    id="btnNavList" onclick="handleNavTab('list')">
+                <div class="nav-icon">📋</div>
+                <div class="nav-label">Danh sách</div>
+            </button>
+            <button type="button" class="btn btn-link text-decoration-none text-center nav-item-btn" id="btnNavLink"
+                    onclick="handleNavTab('link')">
+                <div class="nav-icon">🔗</div>
+                <div class="nav-label">Ghép thẻ</div>
+            </button>
+            <button type="button" class="btn btn-link text-decoration-none text-center nav-item-btn" id="btnNavRefresh"
+                    onclick="handleNavTab('refresh')">
+                <div class="nav-icon">🔄</div>
+                <div class="nav-label">Làm mới</div>
+            </button>
+        </div>
+    </nav>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/mobile.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+
+</html>

@@ -11,14 +11,13 @@ namespace ebs50_backend.Services.Dispatching;
 /// Handles SFTP connectivity, authentication, and atomic file dispatching to the Opticon EBS-50 server.
 /// </summary>
 internal sealed class Ebs50SftpService(
-    IConfiguration configuration,
-    IServiceScopeFactory scopeFactory,
+    IEbs50ConnectionSettingsProvider settingsProvider,
     IWebHostEnvironment env,
     ILogger<Ebs50SftpService> logger) : IEbs50SftpService
 {
     public async Task<SftpTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await GetConnectionSettingsAsync(cancellationToken);
+        var settings = await settingsProvider.GetAsync(cancellationToken);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(15)); // Hard timeout
@@ -80,7 +79,7 @@ internal sealed class Ebs50SftpService(
         ArgumentNullException.ThrowIfNull(imageBytes);
         ArgumentException.ThrowIfNullOrWhiteSpace(xmlContent);
 
-        var settings = await GetConnectionSettingsAsync(cancellationToken);
+        var settings = await settingsProvider.GetAsync(cancellationToken);
 
         // NOTE: Always save locally first to guarantee audit copy and local fallback inspection
         await SaveLocalCopyAsync(macAddress, imageFileName, imageBytes, xmlContent, cancellationToken);
@@ -145,7 +144,7 @@ internal sealed class Ebs50SftpService(
 
     public async Task UploadLinksCsvAsync(string csvContent, CancellationToken cancellationToken = default)
     {
-        var settings = await GetConnectionSettingsAsync(cancellationToken);
+        var settings = await settingsProvider.GetAsync(cancellationToken);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(20));
@@ -255,47 +254,4 @@ internal sealed class Ebs50SftpService(
         return new SftpClient(connectionInfo);
     }
 
-    private async Task<ConnectionSettings> GetConnectionSettingsAsync(CancellationToken cancellationToken)
-    {
-        // 1. Defaults from appsettings.json
-        var host = configuration["Ebs50Settings:Host"] ?? "192.168.1.50";
-        var port = int.TryParse(configuration["Ebs50Settings:Port"], out var p) ? p : 22;
-        var user = configuration["Ebs50Settings:Username"] ?? "root";
-        var pass = configuration["Ebs50Settings:Password"] ?? "";
-        var remotePath = configuration["Ebs50Settings:RemoteInputPath"] ?? "/home/root/ebs_50_run/Input";
-
-        // 2. Override from SQLite SystemSettings table if available
-        using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var dbSettings = await db.SystemSettings
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        foreach (var s in dbSettings)
-        {
-            switch (s.Key)
-            {
-                case "Ebs50Host" when !string.IsNullOrWhiteSpace(s.Value):
-                    host = s.Value.Trim();
-                    break;
-                case "Ebs50Port" when int.TryParse(s.Value, out var dp):
-                    port = dp;
-                    break;
-                case "Ebs50Username" when !string.IsNullOrWhiteSpace(s.Value):
-                    user = s.Value.Trim();
-                    break;
-                case "Ebs50Password":
-                    pass = s.Value;
-                    break;
-                case "RemoteInputPath" when !string.IsNullOrWhiteSpace(s.Value):
-                    remotePath = s.Value.Trim();
-                    break;
-            }
-        }
-
-        return new ConnectionSettings(host, port, user, pass, remotePath);
-    }
-
-    private sealed record ConnectionSettings(string Host, int Port, string Username, string Password, string RemoteInputPath);
 }

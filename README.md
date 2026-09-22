@@ -8,6 +8,7 @@
 
 | Tài liệu | Khi nào đọc |
 | --- | --- |
+| [Sao lưu / Khôi phục database backend](docs/DATABASE_BACKUP.md) | Export/import SQLite qua web, tạm dừng đồng bộ và phục hồi khi lỗi |
 | [Cấu hình EBS50](docs/EBS50_CONFIGURATION.md) | External CMS, tắt Layering, database trên trạm, sao lưu/khôi phục |
 | [Tích hợp MES](docs/MES_API_GUIDE.md) | Gọi API, hiểu kết quả và theo dõi cập nhật |
 | [Vận hành](docs/OPERATIONS_GUIDE.md) | Publish, Windows Service, log, backup backend và xử lý sự cố |
@@ -128,3 +129,8 @@ docs/                 Hướng dẫn và SQL có điều kiện bảo vệ
 ```
 
 Hướng dẫn tạo bộ cài, sao lưu khi nâng cấp và quản lý service nằm trong [OPERATIONS_GUIDE.md](docs/OPERATIONS_GUIDE.md).
+# Truy cập qua hai mạng
+
+Trang `/Network` hiển thị địa chỉ truy cập và chẩn đoán HTTP/TCP bất đồng bộ.
+Xem [hướng dẫn hai mạng](docs/DUAL_NETWORK.md) để cấu hình hai card, firewall, cài service và hoàn tác.
+`Install-Service.ps1` hiện cần `-InterfaceAliases` và `-RemoteSubnets` (hai giá trị tương ứng mỗi tham số).

@@ -20,6 +20,32 @@ public sealed class ApiContractOperationFilter : IOperationFilter
 
         operation.OperationId = $"{action.ControllerName}_{context.MethodInfo.Name}";
 
+        if (action.ControllerName == "Database")
+        {
+            operation.Description = (operation.Description ?? "") + " Localhost only; remote/proxied access is rejected.";
+            if (context.ApiDescription.HttpMethod == "POST")
+            {
+                operation.Parameters.Add(new OpenApiParameter
+                {
+                    Name = "X-CSRF-TOKEN", In = ParameterLocation.Header, Required = true,
+                    Description = "Antiforgery token from /Database, together with its cookie. Reload the page after restarting the server.",
+                    Schema = new OpenApiSchema { Type = "string" }
+                });
+                operation.Responses.TryAdd("400", new OpenApiResponse { Description = "Invalid request or missing/invalid antiforgery token." });
+            }
+            if (context.MethodInfo.Name == "Download")
+            {
+                operation.Responses["200"] = new OpenApiResponse
+                {
+                    Description = "SQLite snapshot and manifest in a ZIP archive.",
+                    Content = new Dictionary<string, OpenApiMediaType>
+                    {
+                        ["application/zip"] = new() { Schema = new OpenApiSchema { Type = "string", Format = "binary" } }
+                    }
+                };
+            }
+        }
+
         // ApiController short-circuits invalid binding/validation before the action runs.
         // Business errors still use the action's declared response type.
         bool hasBoundParameters = context.ApiDescription.ParameterDescriptions

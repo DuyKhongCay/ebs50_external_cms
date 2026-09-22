@@ -9,7 +9,9 @@ param (
     [string]$ServiceName = "Ebs50TagService",
     [string]$DisplayName = "EBS-50 E-Tag Management Service",
     [int]$Port = 6789,
-    [string]$BinaryPath = ""
+    [string]$BinaryPath = "",
+    [string[]]$InterfaceAliases,
+    [string[]]$RemoteSubnets
 )
 
 # NOTE: Require administrator privileges to manage Windows Services and Firewall rules
@@ -51,6 +53,17 @@ if (-not (Test-Path $BinaryPath)) {
 
 Write-Host "[+] Using binary executable: $BinaryPath" -ForegroundColor Green
 $workDir = Split-Path -Parent $BinaryPath
+if (-not $PSBoundParameters.ContainsKey('Port')) {
+    $installedConfig = Get-Content -LiteralPath (Join-Path $workDir 'appsettings.json') -Raw | ConvertFrom-Json
+    if ($null -ne $installedConfig.ServiceSettings.Port) { $Port = [int]$installedConfig.ServiceSettings.Port }
+}
+
+# Validate and apply the reviewed network scope before changing the service.
+# A mismatched port or missing interface/subnet stops installation here.
+$firewallScript = Join-Path $PSScriptRoot 'Configure-NetworkFirewall.ps1'
+$firewallBackup = Join-Path $workDir ("network-firewall-{0}.clixml" -f [Guid]::NewGuid().ToString('N'))
+& $firewallScript -ConfigPath (Join-Path $workDir 'appsettings.json') -Port $Port `
+    -InterfaceAliases $InterfaceAliases -RemoteSubnets $RemoteSubnets -BackupPath $firewallBackup -ErrorAction Stop
 
 # Stop and remove existing service if already registered
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
@@ -82,11 +95,7 @@ Write-Host "[*] Configuring auto-recovery policy (Restart on failure)..." -Foreg
 & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
 
 # Configure Windows Firewall rule for HTTP port
-$ruleName = "EBS-50 E-Tag Service (Port $Port)"
-Write-Host "[*] Configuring Windows Firewall rule: $ruleName..." -ForegroundColor Yellow
-& netsh advfirewall firewall delete rule name="$ruleName" 2>$null | Out-Null
-& netsh advfirewall firewall add rule name="$ruleName" dir=in action=allow protocol=TCP localport=$Port profile=any | Out-Null
-Write-Host "[+] Firewall port $Port opened." -ForegroundColor Green
+Write-Host "[+] Scoped firewall rules configured. Backup: $firewallBackup" -ForegroundColor Green
 
 # Start the service
 Write-Host "[*] Starting Windows Service '$ServiceName'..." -ForegroundColor Yellow
@@ -106,4 +115,3 @@ if ($LASTEXITCODE -eq 0) {
 } else {
     Write-Warning "Service created but could not start immediately. Check Windows Event Viewer (Application log) for details."
 }
-

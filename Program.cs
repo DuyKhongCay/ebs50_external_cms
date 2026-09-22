@@ -1,6 +1,10 @@
 using ebs50_backend.Data;
 using ebs50_backend.Services;
 using Microsoft.EntityFrameworkCore;
+using ebs50_backend.Services.Networking;
+using ebs50_backend.Services.Dispatching;
+using Microsoft.AspNetCore.RateLimiting;
+using ebs50_backend.Services.Database;
 
 // NOTE: Windows Service execution sets CurrentDirectory to C:\Windows\System32 by default.
 // Explicitly set CurrentDirectory to AppContext.BaseDirectory to guarantee consistent file resolution.
@@ -55,26 +59,24 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(listeningPort);
 });
 
-// Register SQLite database context with explicit path anchoring
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Share canonical file resolution between EF, online backup and startup recovery.
+var databaseLocation = new DatabaseLocation(builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=etag_database.db");
+foreach (var publicDirectory in new[] { builder.Environment.WebRootPath,
+    Path.Combine(builder.Environment.ContentRootPath, "Assets"), Path.Combine(AppContext.BaseDirectory, "Assets") })
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                           ?? "Data Source=etag_database.db";
-
-    // NOTE: Anchor relative SQLite DB path to AppContext.BaseDirectory to prevent Windows Service
-    // from attempting to create or access etag_database.db inside C:\Windows\System32.
-    if (connectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
-    {
-        var dataSource = connectionString.Substring("Data Source=".Length).Trim();
-        if (!Path.IsPathRooted(dataSource) && !dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase))
-        {
-            var absoluteDbPath = Path.Combine(AppContext.BaseDirectory, dataSource);
-            connectionString = $"Data Source={absoluteDbPath}";
-        }
-    }
-
-    options.UseSqlite(connectionString);
-});
+    if (string.IsNullOrEmpty(publicDirectory)) continue;
+    var publicRoot = Path.GetFullPath(publicDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+    if (databaseLocation.DatabasePath.StartsWith(publicRoot, StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("Store SQLite and maintenance backups outside publicly served directories.");
+}
+builder.Services.AddSingleton(databaseLocation);
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(databaseLocation.ConnectionString));
+builder.Services.AddSingleton<DatabaseMaintenanceCoordinator>();
+builder.Services.AddSingleton<DatabaseBackupFiles>();
+builder.Services.AddSingleton<DatabaseMaintenanceService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<DatabaseMaintenanceService>());
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
 
 builder.Services.AddScoped<IDbInitializer, DbInitializer>();
 builder.Services.AddScoped<ebs50_backend.Services.Rendering.ITagRenderService, ebs50_backend.Services.Rendering.SkiaTagRenderService>();
@@ -91,6 +93,24 @@ builder.Services.AddScoped<ebs50_backend.Services.Core.TagManager>();
 builder.Services.AddScoped<ebs50_backend.Services.Core.ITagManager, ebs50_backend.Services.Core.ResilientTagManager>();
 
 builder.Services.AddRazorPages();
+builder.Services.AddScoped<IEbs50ConnectionSettingsProvider, Ebs50ConnectionSettingsProvider>();
+builder.Services.AddSingleton<INetworkInterfaceService, NetworkInterfaceService>();
+builder.Services.AddScoped<INetworkDiagnosticsService, NetworkDiagnosticsService>();
+builder.Services.AddHttpClient("NetworkDiagnostics", client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        UseProxy = false,
+        AllowAutoRedirect = false
+    });
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddConcurrencyLimiter("network-diagnostics", limiter =>
+    {
+        limiter.PermitLimit = 1;
+        limiter.QueueLimit = 0;
+    });
+});
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -107,6 +127,9 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Recovery must finish before initialization or any worker can access the database.
+await app.Services.GetRequiredService<DatabaseMaintenanceService>().RecoverOnStartupAsync(CancellationToken.None);
 
 // NOTE: Perform asynchronous database creation and data seeding prior to serving web requests
 using (var scope = app.Services.CreateScope())
@@ -145,6 +168,11 @@ if (Directory.Exists(assetsPath))
 }
 
 app.UseRouting();
+app.UseMiddleware<DatabaseMaintenanceMiddleware>();
+app.UseRateLimiter();
+
+app.MapGet("/health/live", () => Results.Ok(new { status = "Alive" }))
+    .WithName("Liveness").WithSummary("Reports web process liveness, independent of EBS connectivity.");
 
 app.MapRazorPages();
 app.MapControllers();

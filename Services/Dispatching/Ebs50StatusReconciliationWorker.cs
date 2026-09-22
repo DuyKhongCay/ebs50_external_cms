@@ -1,5 +1,6 @@
 using ebs50_backend.Data;
 using Microsoft.EntityFrameworkCore;
+using ebs50_backend.Services.Database;
 
 namespace ebs50_backend.Services.Dispatching;
 
@@ -10,6 +11,7 @@ namespace ebs50_backend.Services.Dispatching;
 /// </summary>
 public sealed class Ebs50StatusReconciliationWorker(
     IServiceScopeFactory scopeFactory,
+    DatabaseMaintenanceCoordinator maintenance,
     ILogger<Ebs50StatusReconciliationWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(25);
@@ -41,6 +43,8 @@ public sealed class Ebs50StatusReconciliationWorker(
 
     private async Task ReconcileStatusesAsync(CancellationToken cancellationToken)
     {
+        using var lease = maintenance.TryEnter(worker: true);
+        if (lease == null) return;
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var statusService = scope.ServiceProvider.GetRequiredService<IEbs50StatusService>();
@@ -108,4 +112,3 @@ public sealed class Ebs50StatusReconciliationWorker(
         }
     }
 }
-

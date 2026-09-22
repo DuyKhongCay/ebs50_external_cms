@@ -1,0 +1,319 @@
+@page "/Mobile"
+@model ebs50_backend.Pages.Mobile.IndexModel
+@{
+    Layout = "_MobileLayout";
+    ViewData["Title"] = "Quản Lý Thẻ E-Tag";
+}
+
+<!-- Offline / Stale Data Banner -->
+<div id="offlineBanner" class="alert alert-warning py-2 px-3 mb-2 d-none offline-banner shadow-sm" role="alert">
+    <div class="d-flex justify-content-between align-items-center">
+        <span>⚠️ <strong>Mất kết nối mạng:</strong> Đang hiển thị dữ liệu đã lưu.</span>
+        <button type="button" class="btn btn-sm btn-outline-dark py-0 px-2" onclick="retryLoadTags()">Thử lại</button>
+    </div>
+</div>
+
+<!-- Alert Box for Operational Feedback -->
+<div id="mobileAlertBox" class="alert alert-dismissible fade show d-none mb-3 shadow-sm" role="alert">
+    <span id="mobileAlertText"></span>
+    <button type="button" class="btn-close" onclick="hideMobileAlert()"></button>
+</div>
+
+<!-- Search & Filter Controls -->
+<section class="card border-0 shadow-sm p-3 mb-3 bg-white" style="border-radius: 12px;">
+    <!-- Search Bar -->
+    <div class="input-group mb-2">
+        <span class="input-group-text bg-light border-end-0">🔍</span>
+        <input type="search" id="searchInput" class="form-control border-start-0 border-end-0 ps-1"
+               placeholder="Tìm mã máy hoặc MAC..." autocomplete="off" />
+        <button class="btn btn-outline-secondary border-start-0 d-none" type="button" id="btnClearSearch" onclick="clearSearchInput()" title="Xóa tìm kiếm">✕</button>
+    </div>
+
+    <!-- Quick Filter Accordion / Toggle -->
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <small class="text-muted fw-semibold">Bộ lọc nâng cao:</small>
+        <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" id="btnToggleFilters" onclick="toggleFilterPanel()">
+            <span id="filterToggleText">Mở rộng ▾</span>
+        </button>
+    </div>
+
+    <div id="filterPanel" class="d-none pt-2 border-top">
+        <div class="row g-2">
+            <!-- Filter by Model -->
+            <div class="col-12">
+                <label for="filterModel" class="form-label small text-muted mb-1">Model sản phẩm:</label>
+                <select id="filterModel" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="">-- Tất cả Model --</option>
+                    @foreach (var m in Model.Models)
+                    {
+                        <option value="@m.ModelCode">@m.ModelCode @(!string.IsNullOrWhiteSpace(m.Description) ? $"({m.Description})" : "")</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Filter by Machine State -->
+            <div class="col-6">
+                <label for="filterState" class="form-label small text-muted mb-1">Trạng thái máy:</label>
+                <select id="filterState" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var s in Model.States)
+                    {
+                        <option value="@s.StateCode">[@s.StateCode] @s.StateNameVi</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Filter by Sync Status -->
+            <div class="col-6">
+                <label for="filterSync" class="form-label small text-muted mb-1">Đồng bộ:</label>
+                <select id="filterSync" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="">-- Tất cả --</option>
+                    <option value="Pending">Chờ gửi</option>
+                    <option value="Dispatching">Đang gửi</option>
+                    <option value="Uploaded">Đã tải lên EBS</option>
+                    <option value="Confirmed">Đã xác nhận</option>
+                    <option value="Error">Lỗi đồng bộ</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="resetFilters()">
+                Đặt lại bộ lọc
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Summary Counter & Status Bar -->
+<div class="d-flex justify-content-between align-items-center mb-2 px-1 text-muted small">
+    <div>
+        <span id="tagsCounterText" class="fw-semibold text-dark">Đang tải thẻ...</span>
+    </div>
+    <div class="d-flex align-items-center gap-1">
+        <span id="syncIndicator" class="spinner-grow spinner-grow-sm text-primary d-none" role="status"></span>
+        <span id="lastUpdatedText" style="font-size: 0.75rem;"></span>
+    </div>
+</div>
+
+<!-- Tags Cards Container -->
+<section id="tagsContainer" class="d-flex flex-column gap-3">
+    <!-- Initial Skeleton Loader -->
+    <div class="tag-card p-3">
+        <div class="d-flex justify-content-between mb-2">
+            <div class="skeleton-box" style="width: 120px; height: 24px;"></div>
+            <div class="skeleton-box" style="width: 60px; height: 24px;"></div>
+        </div>
+        <div class="skeleton-box mb-2" style="width: 80%; height: 16px;"></div>
+        <div class="skeleton-box mb-3" style="width: 50%; height: 16px;"></div>
+        <div class="d-flex gap-2">
+            <div class="skeleton-box" style="flex: 1; height: 38px;"></div>
+            <div class="skeleton-box" style="flex: 1; height: 38px;"></div>
+        </div>
+    </div>
+</section>
+
+<!-- Empty State Container -->
+<div id="emptyState" class="card border-0 shadow-sm p-4 text-center d-none" style="border-radius: 12px;">
+    <div class="fs-1 mb-2">📭</div>
+    <h6 class="fw-bold mb-1">Không tìm thấy thẻ nào</h6>
+    <p class="text-muted small mb-3">Không có thẻ E-Tag nào phù hợp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.</p>
+    <div>
+        <button class="btn btn-outline-primary btn-sm px-3 me-2" onclick="resetFilters()">Xóa bộ lọc</button>
+        <button class="btn btn-primary btn-sm px-3" onclick="openLinkTagModal()">Ghép thẻ mới</button>
+    </div>
+</div>
+
+<!-- Error State Container -->
+<div id="errorState" class="card border-0 shadow-sm p-4 text-center d-none" style="border-radius: 12px;">
+    <div class="fs-1 text-danger mb-2">⚠️</div>
+    <h6 class="fw-bold text-danger mb-1">Lỗi tải dữ liệu</h6>
+    <p class="text-muted small mb-3" id="errorMessageText">Không thể kết nối đến máy chủ EBS-50 backend.</p>
+    <div>
+        <button class="btn btn-primary btn-sm px-4" onclick="retryLoadTags()">Thử lại</button>
+    </div>
+</div>
+
+<!-- ================= MODALS SECTION ================= -->
+
+<!-- Modal 1: Tag Image Preview -->
+<div class="modal fade modal-fullscreen-sm-down" id="modalPreview" tabindex="-1" aria-labelledby="modalPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title fw-bold" id="modalPreviewTitle">Ảnh Thẻ E-Tag</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3 text-center bg-light">
+                <div class="preview-container shadow-sm mb-3">
+                    <img id="previewImage" src="" alt="Live E-Tag Preview" class="d-none" onload="onPreviewImageLoaded()" onerror="onPreviewImageError()" />
+                    <div id="previewSpinner" class="spinner-border text-light" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div id="previewErrorText" class="text-danger small d-none p-3">
+                        Không thể tải ảnh render từ máy chủ.
+                    </div>
+                    <span class="preview-watermark">Server Rendered</span>
+                </div>
+                <div class="card p-2 text-start small border-0 shadow-sm">
+                    <div class="row g-1">
+                        <div class="col-6"><strong>Mã máy:</strong> <span id="previewMachineNo">--</span></div>
+                        <div class="col-6"><strong>Model:</strong> <span id="previewModelCode">--</span></div>
+                        <div class="col-12 text-break"><strong>MAC:</strong> <span id="previewMac" class="font-monospace">--</span></div>
+                        <div class="col-12"><strong>Trạng thái:</strong> <span id="previewState">--</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2 bg-white">
+                <button type="button" class="btn btn-secondary w-100 btn-touch" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Change Tag Machine State -->
+<div class="modal fade modal-fullscreen-sm-down" id="modalChangeState" tabindex="-1" aria-labelledby="modalChangeStateTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title fw-bold" id="modalChangeStateTitle">🔄 Đổi Trạng Thái Máy</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <!-- Tag Info Banner -->
+                <div class="card bg-light border-0 p-2 mb-3 small">
+                    <div class="d-flex justify-content-between">
+                        <span>Máy: <strong id="changeStateMachineNo" class="fs-6 text-primary">--</strong></span>
+                        <span>Model: <strong id="changeStateModel">--</strong></span>
+                    </div>
+                    <div class="text-muted text-break">MAC: <span id="changeStateMac" class="font-monospace">--</span></div>
+                </div>
+
+                <label class="form-label fw-bold mb-2">Chọn trạng thái mới:</label>
+                <div id="stateOptionsList" class="d-flex flex-column gap-2 mb-3" style="max-height: 50vh; overflow-y: auto;">
+                    <!-- Dynamically populated states list -->
+                </div>
+
+                <div id="changeStateError" class="alert alert-danger py-2 small d-none mb-0"></div>
+            </div>
+            <div class="modal-footer py-2 bg-white d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 btn-touch" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary flex-grow-1 btn-touch fw-semibold" id="btnSubmitState" onclick="submitChangeState()">
+                    <span id="spinnerSubmitState" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                    Gửi ra thẻ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Link / Edit Tag -->
+<div class="modal fade modal-fullscreen-sm-down" id="modalLinkTag" tabindex="-1" aria-labelledby="modalLinkTagTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title fw-bold" id="modalLinkTagTitle">🔗 Ghép Thẻ E-Tag</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <form id="formLinkTag" onsubmit="event.preventDefault(); submitLinkTag();">
+                    <!-- MAC Address Input -->
+                    <div class="mb-3">
+                        <label for="linkMacAddress" class="form-label fw-semibold small">Địa chỉ MAC <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control font-monospace text-uppercase" id="linkMacAddress" required
+                               placeholder="Ví dụ: 00124B0012AB hoặc barcode MAC" minlength="4" maxlength="32" onblur="checkExistingMacOnBlur()" />
+                        <div class="form-text text-muted small">Nhập MAC thực tế của thẻ (từ 4 đến 32 ký tự hex).</div>
+                        <div id="existingMacNotice" class="alert alert-info py-1 px-2 small mt-1 d-none"></div>
+                    </div>
+
+                    <!-- Machine Number Input -->
+                    <div class="mb-3">
+                        <label for="linkMachineNo" class="form-label fw-semibold small">Mã Máy / Vị Trí <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="linkMachineNo" required
+                               placeholder="Ví dụ: M-01, LINE-02, CNC-05..." maxlength="50" />
+                    </div>
+
+                    <!-- Product Model Selection / Custom -->
+                    <div class="mb-3">
+                        <label for="linkModelCode" class="form-label fw-semibold small">Model E-Tag <span class="text-danger">*</span></label>
+                        <select class="form-select mb-1" id="linkModelCodeSelect" onchange="handleModelSelectChange()">
+                            <option value="">-- Chọn Model đã có --</option>
+                            @foreach (var m in Model.Models)
+                            {
+                                <option value="@m.ModelCode">@m.ModelCode @(!string.IsNullOrWhiteSpace(m.Description) ? $"({m.Description})" : "")</option>
+                            }
+                            <option value="__CUSTOM__">➕ Nhập Model mới...</option>
+                        </select>
+                        <input type="text" class="form-control d-none mt-1" id="linkCustomModel"
+                               placeholder="Nhập mã Model mới (Ví dụ: SE420RY-B)" maxlength="50" />
+                    </div>
+
+                    <!-- Initial State Code -->
+                    <div class="mb-3">
+                        <label for="linkInitialState" class="form-label fw-semibold small">Trạng thái ban đầu</label>
+                        <select class="form-select" id="linkInitialState">
+                            @foreach (var s in Model.States)
+                            {
+                                <option value="@s.StateCode">[@s.StateCode] @s.StateNameVi</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Auto Dispatch Checkbox -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="linkAutoDispatch" checked>
+                        <label class="form-check-label small fw-semibold" for="linkAutoDispatch">
+                            Bắn lệnh sang EBS-50 ngay sau khi ghép
+                        </label>
+                    </div>
+
+                    <div id="linkFormError" class="alert alert-danger py-2 small d-none mb-0"></div>
+                </form>
+            </div>
+            <div class="modal-footer py-2 bg-white d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 btn-touch" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary flex-grow-1 btn-touch fw-semibold" id="btnSubmitLink" onclick="submitLinkTag()">
+                    <span id="spinnerSubmitLink" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                    Lưu Ghép Nối
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 4: Confirm Unlink Tag -->
+<div class="modal fade modal-fullscreen-sm-down" id="modalConfirmUnlink" tabindex="-1" aria-labelledby="modalUnlinkTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white py-2">
+                <h6 class="modal-title fw-bold" id="modalUnlinkTitle">⚠️ Xác Nhận Hủy Ghép Nối</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <p class="mb-2">Bạn có chắc chắn muốn hủy ghép nối thẻ này khỏi hệ thống không?</p>
+                <div class="card bg-light border-0 p-2 text-start small mb-3">
+                    <div>Mã máy: <strong id="unlinkMachineNo" class="text-danger">--</strong></div>
+                    <div class="text-break">MAC: <span id="unlinkMac" class="font-monospace">--</span></div>
+                </div>
+                <small class="text-muted">Lưu ý: Thẻ sẽ bị xóa khỏi cơ sở dữ liệu CMS quản lý.</small>
+                <div id="unlinkError" class="alert alert-danger py-2 small d-none mt-2"></div>
+            </div>
+            <div class="modal-footer py-2 bg-white d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-grow-1 btn-touch" data-bs-dismiss="modal">Hủy bỏ</button>
+                <button type="button" class="btn btn-danger flex-grow-1 btn-touch fw-semibold" id="btnConfirmUnlink" onclick="submitUnlinkTag()">
+                    <span id="spinnerUnlink" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                    Xác Nhận Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Bootstrap modal instances and page initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            initMobilePage();
+        });
+    </script>
+}

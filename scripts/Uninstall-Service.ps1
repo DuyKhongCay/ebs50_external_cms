@@ -47,6 +47,9 @@ if ($service) {
 }
 
 # Remove Firewall rule
+foreach ($networkRule in @('Ebs50-Web-Network-1', 'Ebs50-Web-Network-2')) {
+    Get-NetFirewallRule -Name $networkRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+}
 $ruleName = "EBS-50 E-Tag Service (Port $Port)"
 Write-Host "[*] Removing Windows Firewall rule: $ruleName..." -ForegroundColor Yellow
 & netsh advfirewall firewall delete rule name="$ruleName" 2>$null | Out-Null
@@ -57,4 +60,3 @@ Write-Host "==========================================================" -Foregro
 Write-Host "  UNINSTALLATION COMPLETED" -ForegroundColor Green
 Write-Host "  Note: Database file (etag_database.db) has been preserved." -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Green
-

@@ -3,6 +3,7 @@ using ebs50_backend.Data;
 using ebs50_backend.Models;
 using ebs50_backend.Services.Rendering;
 using Microsoft.EntityFrameworkCore;
+using ebs50_backend.Services.Database;
 
 namespace ebs50_backend.Services.Dispatching;
 
@@ -16,6 +17,7 @@ internal sealed class EslDispatcherBackgroundWorker(
     IEslDispatchQueue queue,
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
+    DatabaseMaintenanceCoordinator maintenance,
     ILogger<EslDispatcherBackgroundWorker> logger) : BackgroundService
 {
     // Tracks the last successful dispatch timestamp per MAC to enforce cooldown
@@ -23,6 +25,7 @@ internal sealed class EslDispatcherBackgroundWorker(
 
     // Tracks currently in-flight MAC dispatches to guarantee strict per-MAC sequential delivery
     private readonly ConcurrentDictionary<string, byte> _activeMacs = new(StringComparer.OrdinalIgnoreCase);
+    private long _databaseGeneration;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -65,6 +68,14 @@ internal sealed class EslDispatcherBackgroundWorker(
 
     private async Task<bool> DispatchNextDueJobAsync(CancellationToken stoppingToken)
     {
+        using var lease = maintenance.TryEnter(worker: true);
+        if (lease == null) return false;
+        if (_databaseGeneration != maintenance.Generation)
+        {
+            _lastDispatchTimes.Clear();
+            _activeMacs.Clear();
+            _databaseGeneration = maintenance.Generation;
+        }
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -243,6 +254,8 @@ internal sealed class EslDispatcherBackgroundWorker(
 
     private async Task RecoverStaleInFlightJobsAsync(CancellationToken cancellationToken)
     {
+        using var lease = maintenance.TryEnter(worker: true);
+        if (lease == null) return;
         try
         {
             using var scope = scopeFactory.CreateScope();
@@ -271,6 +284,8 @@ internal sealed class EslDispatcherBackgroundWorker(
 
     private async Task HandleGracefulShutdownAsync()
     {
+        using var lease = maintenance.TryEnter(worker: true);
+        if (lease == null) return;
         try
         {
             using var scope = scopeFactory.CreateScope();

@@ -1,0 +1,52 @@
+@page
+@model DatabaseModel
+@{
+    ViewData["Title"] = "Sao lưu / Khôi phục database";
+}
+<h1>Sao lưu / Khôi phục database</h1>
+<p>Sao lưu toàn bộ trạng thái máy, model, tag, lịch sử job và cấu hình lưu trong database.
+    File không bao gồm Assets, appsettings.json hoặc dữ liệu trên thiết bị EBS-50.</p>
+<p class="text-muted">Chức năng chỉ dùng trên máy server qua localhost. Backup có thể chứa mật khẩu kết nối EBS-50.</p>
+@Html.AntiForgeryToken()
+<div id="database-status" class="alert alert-info" role="status" aria-live="polite">Đang đọc trạng thái...</div>
+<div class="row g-3">
+    <section class="col-md-6">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h4">Sao lưu</h2>
+            <p>Tạo file ZIP từ database hiện tại. File tải xuống được lưu trên server trong 24 giờ.</p>
+            <button id="database-export" type="button" class="btn btn-primary">Tạo backup</button>
+            <a id="database-download" class="btn btn-success d-none" href="#">Tải backup</a>
+        </div></div>
+    </section>
+    <section class="col-md-6">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h4">Khôi phục</h2>
+            <form id="database-upload-form">
+                <label for="database-file" class="form-label">File ZIP backup (tối đa 100 MiB)</label>
+                <input id="database-file" type="file" accept=".zip,application/zip" class="form-control mb-3" required />
+                <button id="database-validate" type="submit" class="btn btn-outline-primary">Upload và kiểm tra</button>
+            </form>
+            <div id="database-preview" class="mt-3 d-none">
+                <p id="database-preview-info"></p>
+                <table class="table table-sm"><thead><tr><th>Bảng</th><th>Số bản ghi</th></tr></thead><tbody id="database-counts"></tbody></table>
+                <div class="form-check mb-3">
+                    <input id="database-confirm" type="checkbox" class="form-check-input" />
+                    <label for="database-confirm" class="form-check-label">Tôi xác nhận thay toàn bộ dữ liệu hiện tại. Server sẽ tạo bản phục hồi trước khi thay.</label>
+                </div>
+                <button id="database-restore" type="button" class="btn btn-danger" disabled>Khôi phục database</button>
+            </div>
+        </div></div>
+    </section>
+</div>
+<section id="database-resume-panel" class="alert alert-warning mt-3 d-none">
+    <h2 class="h5">Đồng bộ EBS đang tạm dừng</h2>
+    <p>Trạng thái tag trong backup là dữ liệu lịch sử, chưa được xác minh với thiết bị.
+        Kiểm tra cấu hình kết nối trên <a asp-page="/Index">Bảng điều khiển</a> trước khi tiếp tục.</p>
+    <p>Thao tác dưới đây kết thúc các job cũ chưa hoàn tất và tạo job mới cho tất cả tag theo dữ liệu hiện tại.</p>
+    <button id="database-resume" type="button" class="btn btn-warning">Đồng bộ lại theo dữ liệu hiện tại</button>
+</section>
+<p id="database-message" class="mt-3" role="status" aria-live="polite"></p>
+<p id="database-recovery" class="text-muted text-break"></p>
+@section Scripts {
+    <script src="~/js/database.js" asp-append-version="true"></script>
+}

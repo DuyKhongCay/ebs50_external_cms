@@ -1,6 +1,7 @@
 using ebs50_backend.Data;
 using ebs50_backend.Models;
 using Microsoft.EntityFrameworkCore;
+using ebs50_backend.Services.Database;
 
 namespace ebs50_backend.Services;
 
@@ -11,7 +12,8 @@ namespace ebs50_backend.Services;
 public class DbInitializer(
     AppDbContext context,
     ILogger<DbInitializer> logger,
-    IWebHostEnvironment env) : IDbInitializer
+    IWebHostEnvironment env,
+    DatabaseMaintenanceService maintenance) : IDbInitializer
 {
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -21,6 +23,8 @@ public class DbInitializer(
             await context.Database.EnsureCreatedAsync(cancellationToken);
 
             await MigrateSchemaAsync(cancellationToken);
+            // An intentionally empty restored database must stay empty, including across later restarts.
+            if (maintenance.HasRestoredDatabase) return;
             await SeedMachineStatesAsync(cancellationToken);
             await SeedSystemSettingsAsync(cancellationToken);
             await SeedLegacyDataFromCsvAsync(cancellationToken);
@@ -266,4 +270,3 @@ public class DbInitializer(
         }
     }
 }
-
